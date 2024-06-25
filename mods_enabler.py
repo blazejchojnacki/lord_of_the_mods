@@ -1,10 +1,11 @@
 import os
 import shutil
 
-from common import MODS_FOLDER, BACKUP_FOLDER, EXCEPTION_FOLDERS, MOD_TEMPLATE
+from constants import MODS_FOLDER, BACKUP_FOLDER, EXCEPTION_FOLDERS, MOD_TEMPLATE
 
 
 class Mod:
+    """ a class storing information about a game mod."""
     def __init__(self, name='default_mod'):
         self.name = name
         self.status = ''
@@ -31,12 +32,13 @@ class Mod:
 
 
 def load_mods():
-    output = ''
+    """ loads all mods in the mods folder bypassing folders mentioned as exceptions."""
+    # output = ''
     mods = []
     for module in os.listdir(MODS_FOLDER):
         if module not in EXCEPTION_FOLDERS and os.path.isdir(MODS_FOLDER + '/' + module):
             mods.append(Mod(module))
-            output += mods[-1].name + '\n'
+            # output += mods[-1].name + '\n'
             if os.path.isfile(MODS_FOLDER + '/' + module + '/_mod_parameters.txt'):
                 with open(MODS_FOLDER + '/' + module + '/_mod_parameters.txt') as mod_param_file:
                     mod_param_content = mod_param_file.readlines()
@@ -44,7 +46,7 @@ def load_mods():
                         for param in mods[-1].parameter:
                             try:
                                 mods[-1].parameter[param] = line[line.index(param) + len(param):-1]
-                                output += '\t' + param + mods[-1].parameter[param] + '\n'
+                                # output += '\t' + param + mods[-1].parameter[param] + '\n'
                             except ValueError:
                                 # print("error mods_enabler.load_mods: ValueError")
                                 pass
@@ -55,44 +57,44 @@ def load_mods():
                     for param in mods[-1].parameter:
                         new_param_content += param + mods[-1].parameter[param] + '\n'
                     mod_param_file.write(new_param_content)
-    # print(output)  TODO: log this output
+    # print(output)
     return mods
 
 
 def edit_mod(mod, mod_name=None, mod_status=None, mod_is_active=None, mod_contains_mod=None, mod_contained_in=None,
              mod_description=None):
+    """ modify the information about a given mod"""
     log_output = ''
     if mod_name is not None:
-        log_output += mod.name + " changed to "
-        mod.name = mod_name
-        mod.parameter["name: "] = mod_name
-        log_output += mod.name + '\n'
+        checked_mods = load_mods()
+        if mod_name not in [checked_mod.name for checked_mod in checked_mods]:
+            mod.parameter["name: "] = mod_name
+            os.rename(f'{MODS_FOLDER}/{mod.name}', f'{MODS_FOLDER}/{mod_name}')
+            for checked_mod in checked_mods:
+                if mod.name in checked_mod.contains_mod and mod.name != checked_mod.name:
+                    edit_mod(checked_mod, mod_contains_mod=checked_mod.contains_mod.replace(mod.name, mod_name))
+                if mod.name in checked_mod.contained_in and mod.name != checked_mod.name:
+                    edit_mod(checked_mod, mod_contained_in=checked_mod.contained_in.replace(mod.name, mod_name))
+            log_output += f'name {mod.name} changed to {mod_name}\n'
+        else:
+            print('mods_editor.edit_mod error: name already used')
     if mod_status is not None:
-        log_output += mod.status + " changed to "
-        mod.status = mod_status
         mod.parameter["status: "] = mod_status
-        log_output += mod.status + '\n'
+        log_output += f'status {mod.status} changed to {mod_status}\n'
     if mod_is_active is not None:
-        log_output += mod.is_active + " changed to "
-        mod.is_active = mod_is_active
         mod.parameter["is active: "] = mod_is_active
-        log_output += mod.is_active + '\n'
+        log_output += f'is_active {mod.is_active} changed to {mod_is_active}\n'
     if mod_contains_mod is not None:
-        log_output += mod.contains_mod + " changed to "
-        mod.contains_mod = mod_contains_mod
         mod.parameter["contains mod(s): "] = mod_contains_mod
-        log_output += mod.contains_mod + '\n'
+        log_output += f'contains_mod {mod.contains_mod} changed to {mod_contains_mod}\n'
     if mod_contained_in is not None:
-        log_output += mod.contained_in + " changed to "
-        mod.contained_in = mod_contained_in
         mod.parameter["is contained in mod(s): "] = mod_contained_in
-        log_output += mod.contained_in + '\n'
+        log_output += f'contained_in {mod.contained_in} changed to {mod_contained_in}\n'
     if mod_description is not None:
-        log_output += mod.description + " changed to "
-        mod.description = mod_description
         mod.parameter["description: "] = mod_description
-        log_output += mod.description + '\n'
-    with open(MODS_FOLDER + '/' + mod.name + '/_mod_parameters.txt', 'w') as mod_param_file:
+        log_output += f'description {mod.description} changed to {mod_description}\n'
+    mod.internalise()
+    with open(f'{MODS_FOLDER}/{mod.name}/_mod_parameters.txt', 'w') as mod_param_file:
         new_param_content = ''
         for param in mod.parameter:
             new_param_content += param + mod.parameter[param] + '\n'
@@ -101,13 +103,12 @@ def edit_mod(mod, mod_name=None, mod_status=None, mod_is_active=None, mod_contai
     return log_output
 
 
-def activate_mod(mod):  # TODO: save the logs for later file deactivation
+def activate_mod(mod):
     if mod.is_active == 'yes':
         return "mod is active already"
-    # mods = load_mods()
-    log_activated = 'activated:\n'
-    log_backed_up = 'backed up:\n'
-    mod_path = MODS_FOLDER + '/' + mod.name
+    log_activated = ''  # activated:\n
+    log_backed_up = ''  # backed up:\n
+    mod_path = f'{MODS_FOLDER}/{mod.name}'
     items_list = os.listdir(mod_path)
     folders = []
     files = []
@@ -146,63 +147,66 @@ def activate_mod(mod):  # TODO: save the logs for later file deactivation
         log_activated += f'{activated_file}\n'
     # print(log_backed_up)
     # print(log_activated)
+    with open(f'{BACKUP_FOLDER}/overwritten_by_{mod.name}/log_backed_up.txt', 'w') as text_backed_up:
+        text_backed_up.write(log_backed_up)
+    with open(f'{mod_path}/log_activated.txt', 'w') as text_activated:
+        text_activated.write(log_activated)
     return log_backed_up + log_activated
 
 
-def deactivate_mod(mod):  # TODO: base the removal on logs from activate_mod
+def deactivate_mod(mod):
     if mod.is_active.lower() == 'no':
         return "mod is deactivated already"
+    with open(f'{BACKUP_FOLDER}/overwritten_by_{mod.name}/log_backed_up.txt', 'r') as log_backed_up:
+        list_backed_up = log_backed_up.readlines()
+    with open(f'{MODS_FOLDER}/{mod.name}/log_activated.txt', 'r') as log_activated:
+        list_activated = log_activated.readlines()
     log_deactivated = 'deactivated:\n'
     log_backing_up = 'backing up:\n'
-    mod_path = f'{MODS_FOLDER}/{mod.name}'
-    items_list = os.listdir(mod_path)
-    folders = []
-    files = []
-    for item in items_list:
-        if os.path.isdir(f'{mod_path}/{item}'):
-            folders.append(item)  # mod_path + '/' +
-            for next_item in os.listdir(f'{mod_path}/{item}'):
-                items_list.append(f'{item}/{next_item}')
-                if os.path.isdir(f'{mod_path}/{item}/{next_item}'):
-                    folders.append(f'{item}/{next_item}')  # mod_path + '/' +
-        elif os.path.isfile(f'{mod_path}/{item}'):
-            files.append(item)
+    for line in list_activated:
+        if os.path.isfile(line.strip()):
+            deactivated_file = f'O:/{line.strip()}'
+            if os.path.exists(deactivated_file):
+                os.remove(deactivated_file)
+                log_deactivated += f'{deactivated_file}\n'
+        elif os.path.isdir(line.strip()):
+            deactivated_folder = f'O:/{line.strip()}'
+            try:
+                if not os.listdir(deactivated_folder):
+                    os.rmdir(deactivated_folder)
+                    log_deactivated += deactivated_folder + '\n'
+            except PermissionError:
+                log_deactivated += deactivated_folder + ' could not be removed\n'
+                print("error mods_enabler.deactivate_mod(): permission denied 1")
+            except FileNotFoundError:
+                log_deactivated += deactivated_folder + ' could not be found\n'
+                print(f"error mods_enabler.deactivate_mod(): FileNotFoundError 1")
         else:
-            print(f"error mods_enabler.deactivate_mod(): item {item} is neither file nor folder ")
-    for file in files:
-        deactivated_file = f'O:/{file}'
-        if os.path.exists(deactivated_file):
-            os.remove(deactivated_file)
-            log_deactivated += f'{deactivated_file}\n'
-        backing_up_file = f'{BACKUP_FOLDER}/overwritten_by_{mod.name}/{file}'
-        if os.path.exists(backing_up_file):
-            shutil.move(backing_up_file, deactivated_file)
-            log_backing_up += f'{backing_up_file}\n'
-    for folder in folders:
-        deactivated_folder = f'O:/{folder}'
-        try:
-            if not os.listdir(deactivated_folder):
-                os.rmdir(deactivated_folder)
-                log_deactivated += deactivated_folder + '\n'
-        except PermissionError:
-            log_deactivated += deactivated_folder + ' could not be removed\n'
-            print("error mods_enabler.deactivate_mod(): permission denied 1")
-        except FileNotFoundError:
-            log_deactivated += deactivated_folder + ' could not be found\n'
-            print(f"error mods_enabler.deactivate_mod(): FileNotFoundError 1")
-        backed_up_folder = f'{BACKUP_FOLDER}/overwritten_by_{mod.name}/{folder}'
-        try:
-            if not os.listdir(backed_up_folder):
-                os.rmdir(backed_up_folder)
-                log_backing_up += backed_up_folder + '\n'
-        except PermissionError:
-            log_backing_up += backed_up_folder + ' could not be removed\n'
-            print("error mods_enabler.deactivate_mod(): permission denied 2")
-        except FileNotFoundError:
-            log_backing_up += backed_up_folder + ' could not be found\n'
-            print(f"error mods_enabler.deactivate_mod(): FileNotFoundError 2")
+            print(f"error mods_enabler.deactivate_mod(): item {line} is neither file nor folder ")
+    for line in list_backed_up:
+        if os.path.isdir(line.strip()):
+            backed_up_folder = f'{BACKUP_FOLDER}/overwritten_by_{mod.name}/{line.strip()}'
+            try:
+                if not os.listdir(backed_up_folder):
+                    os.rmdir(backed_up_folder)
+                    log_backing_up += backed_up_folder + '\n'
+            except PermissionError:
+                log_backing_up += backed_up_folder + ' could not be removed\n'
+                print("error mods_enabler.deactivate_mod(): permission denied 2")
+            except FileNotFoundError:
+                log_backing_up += backed_up_folder + ' could not be found\n'
+                print(f"error mods_enabler.deactivate_mod(): FileNotFoundError 2")
+        elif os.path.isfile(line.strip()):
+            backing_up_file = f'{BACKUP_FOLDER}/overwritten_by_{mod.name}/{line.strip()}'
+            if os.path.exists(backing_up_file):
+                shutil.move(backing_up_file, f'O:/{line.strip()}')
+                log_backing_up += f'{backing_up_file}\n'
+        else:
+            print(f"error mods_enabler.deactivate_mod(): item {line.strip()} is neither file nor folder ")
     # print(log_backing_up)
     # print(log_deactivated)
+    os.remove(f'{BACKUP_FOLDER}/overwritten_by_{mod.name}/log_backed_up.txt')
+    os.remove(f'{MODS_FOLDER}/{mod.name}/log_activated.txt')
     return log_backing_up + log_deactivated
 
 
@@ -246,5 +250,20 @@ def create_mod(named, from_template=MOD_TEMPLATE):
                 print("error mods_enabler.create_mod(): permission denied")
             except FileExistsError:
                 print(f"error mods_enabler.create_mod(): FileNotFoundError")
+            if file == '_mod_parameters.txt':
+                with open(f'O:/_MODULES/{named}/{file}', 'r') as read_file:
+                    read_lines = read_file.readlines()
+                    new_content = ''
+                for line in read_lines:
+                    if 'name: ' in line:
+                        new_content += f'name: {named}\n'
+                    else:
+                        new_content += line
+                with open(f'O:/_MODULES/{named}/{file}', 'w') as overwritten_file:
+                    overwritten_file.write(new_content)
+        # mods = load_mods()
+        # for mod in mods:
+        #     if mod.name == named:
+        #         edit_mod(mod, mod_name=named)
         return log_copied
 
