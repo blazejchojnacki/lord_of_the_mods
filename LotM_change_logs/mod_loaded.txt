@@ -1,0 +1,47 @@
+backed up:
+O:/_BACKUPS/overwritten_by_dummy1/AotR
+O:/_BACKUPS/overwritten_by_dummy1/AotR/aotr
+O:/_BACKUPS/overwritten_by_dummy1/BfME2
+O:/_BACKUPS/overwritten_by_dummy1/BfME2-RotWK
+O:/_BACKUPS/overwritten_by_dummy1/_mod_parameters.txt
+
+activated:
+O:/_MODULES/dummy1/_mod_parameters.txt
+
+is_active no changed to yes
+
+backing up:
+backing up:
+O:/_BACKUPS/overwritten_by_dummy1/AotR/aotr
+O:/_BACKUPS/overwritten_by_dummy1/BfME2
+O:/_BACKUPS/overwritten_by_dummy1/BfME2-RotWK
+O:/_BACKUPS/overwritten_by_dummy1/_mod_parameters.txt
+
+deactivated:
+deactivated:
+O:/_MODULES/dummy1/_mod_parameters.txt
+
+is_active yes changed to no
+
+backed up:
+O:/_BACKUPS/overwritten_by_dummy1/AotR/aotr
+O:/_BACKUPS/overwritten_by_dummy1/BfME2
+O:/_BACKUPS/overwritten_by_dummy1/BfME2-RotWK
+O:/_BACKUPS/overwritten_by_dummy1/_mod_parameters.txt
+
+activated:
+O:/_MODULES/dummy1/_mod_parameters.txt
+
+is_active no changed to yes
+
+backing up:
+O:/_BACKUPS/overwritten_by_dummy1/AotR/aotr
+O:/_BACKUPS/overwritten_by_dummy1/BfME2
+O:/_BACKUPS/overwritten_by_dummy1/BfME2-RotWK
+O:/_BACKUPS/overwritten_by_dummy1/_mod_parameters.txt
+
+deactivated:
+O:/_MODULES/dummy1/_mod_parameters.txt
+
+is_active yes changed to no
+

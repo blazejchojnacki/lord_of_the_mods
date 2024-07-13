@@ -35,16 +35,6 @@ def load_items(from_file):
                         if word[0] in items_levels[0]:
                             file_item_type = items_levels
                             break
-            # file_lines = loaded_file.readlines()
-            # for file_line in file_lines:
-            #     word = file_line.split()
-            #     if len(word) > 0 and not file_item_type:
-            #         for items_levels in INI_DELIMITERS:
-            #             if word[0] in items_levels[0] and items_levels not in file_item_type:
-            #                 file_item_type = items_levels
-            #                 break
-            #     elif file_item_type:
-            #         break
     file_item_type.append([])
     items[0].sublevel = file_item_type
     index_tracker = 0
@@ -174,13 +164,39 @@ def print_items(items):
     return output, levels_list
 
 
-def comment_out(printed_item):
+def comment_out(lines):
     """ comments out a few lines in a loaded and printed item"""
     output = ''
-    for line in printed_item.split('\n'):
+    for line in lines.split('\n'):
         output += f';;;{line}\n'
     return output
 
 
 # from tkinter.filedialog import askopenfilename
 # print(print_items(load_items(askopenfilename()))[0])
+
+
+def convert_string(string, direction='automatic'):
+    """
+
+    :param string: str to convert
+    :param direction: 'automatic', 'process', 'display'
+    :return: converted string
+    """
+    to_convert = {
+        '\n': '\\n',
+        '\t': '\\t',
+        '\r': '\\r',
+        ' ': '·'
+    }
+    for key in to_convert:
+        if direction == 'process' or to_convert[key] in string and direction != 'display':
+            for character in to_convert:
+                string = string.replace(to_convert[character], character)
+            return string
+        elif key in string or direction == 'display':
+            for character in to_convert:
+                string = string.replace(character, to_convert[character])
+            return string
+        else:
+            return string

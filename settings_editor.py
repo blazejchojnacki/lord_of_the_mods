@@ -1,30 +1,19 @@
-# from constants import INI_ENDS
 import os.path
 
 INI_ENDS = ['End', 'END', 'EndScript']
 SETTINGS_FILE = 'LotM_settings.ini'
 
-GAME_PATH = ''  # r'O:\BfME2-RotWK\lotrbfme2ep1.exe -mod "O:\AotR\aotr"'
-WORLDBUILDER_PATH = ''  # r'O:\AotR\aotr\Worldbuilder.exe'
-LOG_PATH = ''  # 'O:/_MODULES/AotR8-INI_remake (ongoing)/AotR/aotr/change_log.txt'
-MODS_FOLDER = ''  # 'O:/_MODULES'
-BACKUP_FOLDER = ''  # 'O:/_BACKUPS'
-EXCEPTION_FOLDERS = []  # ["!BACKUP", "!INSTLOGS", "AotR8-INI_backup",
-                     # "AotR8-INI_remake (ongoing)",
-                     # "AotR8_sortingOverride(ongoing)",
-                     # "AotR8_Worldbuilder(working upgradeable)",
-                     # "AotR8_Worldbuilder(working upgraded)",
-                     # "original-BIG_deployed (ongoing)",
-                     # "original-INI-backup",
-                     # "original-INI-BIG_override (working)",
-                     # "original-INI-content_override (aborted)",
-                     # "RotWK-patches_deployed (not-working)",
-                     # "__empty base"
-                     # ]
-MOD_TEMPLATE = ''  # "O:/_MODULES/__empty base"
+GAME_PATH = ''
+WORLDBUILDER_PATH = ''
+LOG_PATH = ''
+MODS_FOLDER = ''
+BACKUP_FOLDER = ''
+EXCEPTION_FOLDERS = []
+MOD_TEMPLATE = ''
 
 
 def read_settings():
+    """ returns a dictionary of settings read from the SETTING_FILE"""
     settings = {}
     with open(SETTINGS_FILE) as settings_file:
         settings_lines = settings_file.readlines()
@@ -43,13 +32,15 @@ def read_settings():
             settings[container_name] = []
         elif line.strip() in INI_ENDS:
             container_open = False
-        else:
-            # print(line)
-            pass
+        # else:
+        #     pass
     return settings
 
 
 def load_settings():
+    """ composes the variables used by the programs functions out of the read settings.
+
+    The sensitivity of the hardcoded values is most probably the biggest weakness of the program."""
     global GAME_PATH, WORLDBUILDER_PATH, MODS_FOLDER, BACKUP_FOLDER, EXCEPTION_FOLDERS, MOD_TEMPLATE, LOG_PATH
     settings = read_settings()
     GAME_PATH = '/'.join((settings['installation_path'], settings['RotWK_folder_name'], settings['game_to_launch']))
@@ -67,6 +58,13 @@ def load_settings():
 
 
 def save_settings(dictionary_settings=None, **keyword_settings):
+    """
+    reads values inserted in the application and saves them to the SETTING_FILE.
+    Then it checks if the new settings are valid. If not retrieves the previous settings.
+    :param dictionary_settings:
+    :param keyword_settings:
+    :return: string sentence about success or failure to find the paths provided
+    """
     if not keyword_settings and dictionary_settings is not None:
         keyword_settings = dictionary_settings
     settings = read_settings()
@@ -84,10 +82,6 @@ def save_settings(dictionary_settings=None, **keyword_settings):
             if key in keyword_settings and not container_open:
                 settings_new_content += line.replace(value, keyword_settings[key])
             elif container_open and container_name in keyword_settings:
-                # if container_counter + 1 < len(settings[container_name]):
-                #     settings_new_content += line.replace(value, keyword_settings[container_name][container_counter])
-                # else:
-                #     for _ in range(len(keyword_settings[container_name]) + 1 - len(settings[container_name])):
                 if container_counter + 1 == len(settings[container_name]):
                     for setting_value in keyword_settings[container_name]:
                         settings_new_content += line.replace(value, setting_value)
@@ -113,7 +107,6 @@ def save_settings(dictionary_settings=None, **keyword_settings):
             if not os.path.exists(path) and save_file:
                 if not os.path.exists(os.path.abspath(path)):
                     if not os.path.exists(path.split()[0]):
-                        # if not os.path.exists(f'{MODS_FOLDER}/{path}'):
                         save_file = False
         except TypeError:
             for folder in path:
@@ -131,4 +124,3 @@ def save_settings(dictionary_settings=None, **keyword_settings):
 
 
 # print(save_settings(mods_templates=['__empty base']))  # , 'yes', 'AotR8-INI_backup'
-# read_settings()

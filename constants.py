@@ -1,10 +1,9 @@
 from settings_editor import load_settings
 GAME_PATH, WORLDBUILDER_PATH, MODS_FOLDER, BACKUP_FOLDER, EXCEPTION_FOLDERS, MOD_TEMPLATE, LOG_PATH = load_settings()
-# SETTINGS_FILE = 'LotM_settings.ini'
 
 LEVEL_INDENT = ' ' * 4
 INI_FOLDER_PART = 'data/ini'
-INI_COMMENTS = ['/', ';']  # , '\n'
+INI_COMMENTS = ['/', ';']
 INI_DELIMITERS = [
     [
         [
@@ -504,4 +503,4 @@ INI_PARAMETERS = [
     # "Side",
     # "EditorSorting",
     # "Browser"
-]
+]  # parameters to be set as first of each object

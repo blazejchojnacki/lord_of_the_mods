@@ -2,11 +2,12 @@ from datetime import datetime
 import os
 import shutil
 
-from file_interpreter import load_items, print_items, comment_out
-from constants import MODS_FOLDER, INI_FOLDER_PART, INI_COMMENTS
+from file_interpreter import load_items, print_items, comment_out, convert_string
+from constants import MODS_FOLDER, INI_FOLDER_PART, INI_COMMENTS, LOG_PATH
 
 # TODO later: reference checker
-# TODO later: fuse find and replace
+# TODO: file comparator
+# TODO: automated proposition of #include creation or child adopting
 
 
 def find_text(find, in_file_or_folder, mode=0):
@@ -14,16 +15,22 @@ def find_text(find, in_file_or_folder, mode=0):
 
     In mode 2 returns the first line where the string was found. It returns an empty string if not found"""
     output = ''
+    if not find:
+        return 'file_editor.find_text() aborted - empty string to find'
+    if MODS_FOLDER.replace('/', '\\') not in in_file_or_folder.replace('/', '\\'):
+        return 'file_editor.replace_text() aborted - item not in MODS_FOLDER'
     if mode == 0:
-        output += f' command: find "{find}"\n\tin {in_file_or_folder}.\nresult:'
+        output += f' command: find "{convert_string(find, direction="display")}"\n\tin {in_file_or_folder}.\nresult:'
+    find = convert_string(find, direction='process')
     if os.path.isdir(in_file_or_folder):
         file_paths = os.listdir(in_file_or_folder)
         for file_path in file_paths:
             output += find_text(find, f'{in_file_or_folder}/{file_path}', mode=1)
     elif os.path.isfile(in_file_or_folder):
         try:
-            with open(in_file_or_folder, 'r') as file:
-                file_content = file.read()
+            # with open(in_file_or_folder, 'r') as file:
+            #     file_content = file.read()
+            file_content = print_items(load_items(in_file_or_folder))[0]
             if file_content.count(find) > 0:
                 if mode < 2:
                     output += f'\tin {in_file_or_folder} found {file_content.count(find)}:\n'
@@ -36,42 +43,62 @@ def find_text(find, in_file_or_folder, mode=0):
                     output = file_content[file_content.rfind('#include', 0, file_content.find(find)):
                                           file_content.find('\n', file_content.find(find))]
                     # output = in_file_or_folder
+            elif mode == 0:
+                output += f'\tfound {file_content.count(find)}\n'
         except UnicodeDecodeError:
-            print("error file_editor.find_text(): file unreadable")
+            output += f'file_editor.find_text() error: file {in_file_or_folder} unreadable'
+        except ValueError:
+            output += f'file_editor.find_text() error: ValueError'
     return output
 
 
 def replace_text(find, replace_with, in_file_or_folder, mode=0):
     """ replaces a given string by another in a given file or folder of files """
     output = ''
-    if MODS_FOLDER not in in_file_or_folder:
-        print('failsafe: alter mods only!')
-        return 'failsafe: alter mods only!'
+    if not find:
+        return 'file_editor.find_text() aborted - empty string to find'
+    if MODS_FOLDER.replace('/', '\\') not in in_file_or_folder.replace('/', '\\'):
+        return 'file_editor.replace_text() aborted - item not in MODS_FOLDER'
     if mode == 0:
         output += f'{datetime.now()}'
-        output += f' command: replace "{find}"\n\twith "{replace_with}"\n\tin {in_file_or_folder}.\nresult:'
+        output += (f' command: replace "{convert_string(find, direction="display")}"'
+                   f'\n\twith "{replace_with}"\n\tin {in_file_or_folder}.\nresult:')
+    find = convert_string(find, direction='process')
     if os.path.isfile(in_file_or_folder):
         try:
-            with open(in_file_or_folder, 'r') as file:
-                file_content = file.read()
+            # with open(in_file_or_folder, 'r') as file:
+            #     file_content = file.read()
+            file_content = print_items(load_items(in_file_or_folder))[0]
             if file_content.count(find) > 0:
                 output += f'\t{file_content.count(find)} replaced in {in_file_or_folder}\n'
                 new_file_content = file_content.replace(find, replace_with)
                 with open(in_file_or_folder, 'w') as file:
                     file.write(new_file_content)
         except UnicodeDecodeError:
-            print(f'error file_editor.replace_text(): file {in_file_or_folder} unreadable')
+            print(f'file_editor.replace_text() error: file {in_file_or_folder} unreadable')
     elif os.path.isdir(in_file_or_folder):
         file_paths = os.listdir(in_file_or_folder)
         for file_path in file_paths:
             output += replace_text(find, replace_with, f'{in_file_or_folder}/{file_path}', mode=0)
-        # if first_run:
-        #     with open(LOG_PATH, 'a') as log_file:
-        #         log_file.write(output + '\n')
+        # if mode == 0:
+    try:
+        with open(f'{LOG_PATH}/file_changes.txt', 'a') as log_file:
+            log_file.write(output + '\n')
+    except FileNotFoundError:
+        with open(f'{LOG_PATH}/file_changes.txt', 'w') as log_file:
+            log_file.write(output + '\n')
     return output
 
 
 def update_reference(new_path, in_file_or_folder, mode=0):
+    """
+    internal function triggered when a .inc file is moved.
+     needs to be a separate function to call itself without triggering the rest of the move function
+    :param new_path:
+    :param in_file_or_folder:
+    :param mode:
+    :return: logs of updated #include paths
+    """
     output = ''
     line_include = ''
     old_path = ''
@@ -117,6 +144,13 @@ def update_reference(new_path, in_file_or_folder, mode=0):
 
 
 def update_single_reference(old_path, new_path, mode=0):
+    """
+    internal function triggered when a .ini file is moved
+    :param old_path:
+    :param new_path:
+    :param mode:
+    :return:
+    """
     file_to_open = ''
     if mode == 1:
         file_to_open = old_path
@@ -150,6 +184,8 @@ def move_file(full_path, to_folder, mode=0):
     """moves a given file to a given folder and updates the references to or in this file."""
     output = ''
     file_name = full_path.replace('\\', '/').split('/')[-1]
+    if MODS_FOLDER not in to_folder:
+        return 'file_editor.move_file aborted - destination path not in MODS_FOLDER'
     try:
         if mode == 0:
             output += f'{datetime.now()}'
@@ -161,12 +197,24 @@ def move_file(full_path, to_folder, mode=0):
         elif file_name.endswith('.ini'):
             output += update_single_reference(old_path=full_path, new_path=f'{to_folder}/{file_name}', mode=mode)
     except shutil.Error:
-        # print('file_editor.move_file error: erroneous path')
         output += 'file_editor.move_file error: erroneous path'
+    try:
+        with open(f'{LOG_PATH}/file_changes.txt', 'a') as log_file:
+            log_file.write(output + '\n')
+    except FileNotFoundError:
+        with open(f'{LOG_PATH}/file_changes.txt', 'w') as log_file:
+            log_file.write(output + '\n')
     return output
 
 
+# TODO: comment a part of the displayed text
+# TODO: look for duplicates in other files too. Objects can be overwritten.
 def duplicates_commenter(in_file):
+    """
+    finds the duplicates in a given file
+    :param in_file: string path of the file to load
+    :return: logs of the values commented out
+    """
     new_content = ''
     output = f'{datetime.now()}'
     output += f' command: comment out duplicates in {in_file}:\n'
@@ -185,8 +233,12 @@ def duplicates_commenter(in_file):
             output += print_items([items[0], items[item_index]])
         else:
             new_content += print_items([items[0], items[item_index]])
-    # with open(LOG_PATH, 'a') as log_file:
-    #     log_file.write(output + '\n')
+    try:
+        with open(f'{LOG_PATH}/file_changes.txt', 'a') as log_file:
+            log_file.write(output + '\n')
+    except FileNotFoundError:
+        with open(f'{LOG_PATH}/file_changes.txt', 'w') as log_file:
+            log_file.write(output + '\n')
     with open(in_file, 'w') as new_file:
         new_file.write(new_content)
     return output
@@ -197,6 +249,11 @@ def duplicates_commenter(in_file):
 
 
 def load_file(full_path):
+    """
+
+    :param full_path: absolute path of the file to load into the text editor
+    :return: the file content
+    """
     if full_path.endswith('.ini') or full_path.endswith('.str'):
         file_content, file_levels = print_items(load_items(full_path))
         return file_content, file_levels
@@ -207,6 +264,13 @@ def load_file(full_path):
 
 
 def load_directories(full_path, mode=0):
+    """
+
+    :param full_path:
+    :param mode: mode=0 makes the function omit the full path,
+     mode=1 makes the function provide the full path of each item
+    :return: a tuple of two lists of folders and files contained in the given directory
+    """
     output_folders = []
     output_files = []
     items = os.listdir(full_path)

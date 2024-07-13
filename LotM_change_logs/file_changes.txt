@@ -1,0 +1,22 @@
+2024-06-30 19:45:30.913702 command: replace "\n;--------------------------------------------------------------------------------------------------"
+	with ""
+	in O:\_MODULES\AotR8-INI_remake (ongoing)\AotR\aotr\data\ini\object\nature\aotrrocks.ini.
+result:	30 replaced in O:\_MODULES\AotR8-INI_remake (ongoing)\AotR\aotr\data\ini\object\nature\aotrrocks.ini
+
+2024-06-30 19:50:06.786623 command: replace "\n;--------------------------------------------------------------------------------------------------"
+	with ""
+	in O:\_MODULES\AotR8-INI_remake (ongoing)\AotR\aotr\data\ini\object\nature\aotrrocks.ini.
+result:
+2024-06-30 19:52:37.705998 command: replace "\n;--------------------------------------------------------------------------------------------------"
+	with ""
+	in O:\_MODULES\AotR8-INI_remake (ongoing)\AotR\aotr\data\ini\object\nature\aotrrocks.ini.
+result:
+2024-06-30 19:53:31.659851 command: replace "\n;--------------------------------------------------------------------------------------------------"
+	with ""
+	in O:\_MODULES\AotR8-INI_remake (ongoing)\AotR\aotr\data\ini\object\nature\aotrrocks.ini.
+result:
+2024-06-30 20:04:22.414389 command: replace "\n;--------------------------------------------------------------------------------------------------"
+	with ""
+	in O:\_MODULES\AotR8-INI_remake (ongoing)\AotR\aotr\data\ini\object\nature\aotrrocks.ini.
+result:	1 replaced in O:\_MODULES\AotR8-INI_remake (ongoing)\AotR\aotr\data\ini\object\nature\aotrrocks.ini
+
