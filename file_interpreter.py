@@ -1,24 +1,34 @@
+import os
+from datetime import datetime
+from glob import glob
+import codecs
+
 from constants import INI_COMMENTS, INI_DELIMITERS, STR_DELIMITERS, INI_ENDS, LEVEL_INDENT
+from settings_editor import WORLDBUILDER_PATH
 
 
 class ItemLevel:
     """ a class storing a part of an item like an Object or an ObjectCreationList defined in an INI or STR file"""
     def __init__(self, level_class='', order_index=0):
-        super().__init__()
+        # super().__init__()
         self.parameter = {}
         self.level_class = level_class
         self.name = ''
         self.tag = ''
         self.content = {'all': ''}
-        self.comment = {'init': '',
-                        'all': ''}
+        self.comment = {'init': '', 'all': ''}
         self.is_level_open = True
         self.sublevel = []
         self.order_index = order_index
 
 
-def load_items(from_file):
-    """ loads and reformats items like an Object or an ObjectCreationList defined in an INI or STR file"""
+def load_items(from_file, mode=0):
+    """
+     loads and reformats items like an Object or an ObjectCreationList defined in an INI or STR file
+    :param from_file: the full path of the source file to read the objects from
+    :param mode: mode=1 enables to exit at the first error with the object list created so far
+    :return: loaded items in form of a list of ItemLevel objects where the first describes the source file
+    """
     current_level = 0
     items = [ItemLevel('file')]
     items[0].name = from_file
@@ -43,6 +53,7 @@ def load_items(from_file):
         file_lines = loaded_file.readlines()
         line_counter = 0
         for file_line in file_lines:
+            # try:
             line_counter += 1
             words = file_line.replace('=', ' ').replace(':', ' ').split()
             if file_line.strip() == '':
@@ -112,12 +123,21 @@ def load_items(from_file):
                     items[-1].content[index_tracker] = f"{LEVEL_INDENT}{' '.join(file_line.split())}\n"
                     index_tracker += 1
             else:
+                if mode == 1:
+                    return items
                 print('exception: ' + file_line)
+            # except IndexError:
+            #     if mode == 1:
+            #         return items
     return items
 
 
 def print_items(items):
-    """ concatenates a string from loaded items like an Object or an ObjectCreationList defined in an INI or STR file"""
+    """
+     concatenates a string from loaded items like an Object or an ObjectCreationList defined in an INI or STR file
+    :param items: loaded items as a list of object returned by the load_items() function
+    :return: printable string being the reformatted content of a file
+    """
     output = ''
     levels_list = []
     splitter = ' '
@@ -159,7 +179,7 @@ def print_items(items):
                                 output += sublevel.content['all']
                                 output += f'{LEVEL_INDENT}End\n'
                 except KeyError:
-                    pass
+                    print('file_interpreter: print_items() error: KeyError')
             output += 'End\n'
     return output, levels_list
 
@@ -178,7 +198,7 @@ def comment_out(lines):
 
 def convert_string(string, direction='automatic'):
     """
-
+    converts the \n \t \r characters for reading or for finding the string in a file
     :param string: str to convert
     :param direction: 'automatic', 'process', 'display'
     :return: converted string
@@ -200,3 +220,133 @@ def convert_string(string, direction='automatic'):
             return string
         else:
             return string
+
+
+counter = 1
+object_override_path = r'O:\_MODULES\AotR8-INI_remake (ongoing)\AotR\aotr\data\ini\object\zealous_override\all_objects.txt'
+default_object_path = r'O:\_MODULES\AotR8-INI_remake (ongoing)\AotR\aotr\data\ini\object'
+
+
+def list_objects(file_or_folder=default_object_path, object_list_path=object_override_path, mode=0):
+    """
+    creates or overwrites a file where all objects are listed
+    :param file_or_folder: source directory to get the objects from
+    :param object_list_path: destination path for saving the list into
+    :param mode: mode=0 .txt file | mode=1 .ini file with valid objects
+    :return: a list of objects wrote to the file
+    """
+    global counter
+    items_name_list = []
+    # object_blocks = []
+    # for item in loaded_items[1:]:
+    #     items_name_list.append(item.name)
+    if os.path.isfile(file_or_folder) and file_or_folder.endswith('.ini'):
+        with open(file_or_folder) as read_file:
+            file_lines = read_file.readlines()
+        for file_line in file_lines:
+            try:
+                if file_line.strip().split()[0] in INI_DELIMITERS[4][0]:
+                    if mode == 0:
+                        items_name_list.append(f'{file_line.strip()}\n')
+                    elif mode == 1:
+                        counter_string = '0' * (5 - len(str(counter))) + str(counter)
+                        items_name_list.append(f';{counter_string}; {file_or_folder}\n{file_line.strip()}\n\nEnd\n\n')
+                        counter += 1
+            except IndexError:
+                pass
+    elif os.path.isdir(file_or_folder):
+        list_dir = os.listdir(file_or_folder)
+        for item in list_dir:
+            items_name_list += list_objects(f'{file_or_folder}/{item}', mode=mode)
+    if mode == 1:
+        object_list_path = object_list_path.replace('.txt', '.ini')
+    with open(object_list_path, 'w') as override_file:
+        override_file.write(f';;;{str(datetime.now()).split(".")[0]}\n')  # .replace(":", "_")
+        for object_block in items_name_list:
+            override_file.write(object_block)
+    return items_name_list
+# list_objects(mode=0)
+
+
+def compare_object_lists(object_list1, object_list2):
+    """
+    unfinished
+    :param object_list1:
+    :param object_list2:
+    :return:
+    """
+    with open(object_list1) as object_file1:
+        object_lines1 = object_file1.readlines()
+    with open(object_list2) as object_file2:
+        object_lines2 = object_file2.readlines()
+    for object_line1 in object_lines1:
+        for object_line2 in object_lines2:
+            if object_line1 == object_line2:
+                pass
+
+
+def test_compare_object_lists(mode=0):
+    """
+    unfinished
+    :param mode:
+    :return:
+    """
+    global object_override_path
+    file_type = '.>type<'
+    if mode == 0:
+        file_type = '.txt'
+    elif mode == 1:
+        file_type = '.ini'
+    object_list_path_1 = object_override_path.replace(file_type, f'_1{file_type}')
+    list_objects(object_list_path=object_list_path_1, mode=mode)
+    object_list_path_2 = object_override_path.replace(f'_1{file_type}', f'_2{file_type}')
+    list_objects(object_list_path=object_list_path_2, mode=mode)
+    compare_object_lists(object_list_path_1, object_list_path_2)
+
+
+ERROR_TYPES = ["Error parsing field 'End' in block 'Object' in file",
+               "Error parsing block 'Object' in file",
+               "Error parsing INI block 'ChildObject' in file"]
+
+
+def launch_and_read_last_dump():
+    os.system(WORLDBUILDER_PATH)
+    all_dumps = glob(WORLDBUILDER_PATH[:WORLDBUILDER_PATH.rfind('worldbuilder.exe')] + "DUMP_*.dmp")
+    last_dump = max(all_dumps, key=os.path.getctime)
+    with (codecs.open(last_dump, 'rb') as error_content_file):
+        error_content = error_content_file.read()
+        readable_content = ''
+        for character in error_content:
+            # try:
+            if character in range(32, 123):
+                readable_content += f'{character:c}'
+            # except:
+            #     pass
+        line_index_start = 0
+        for error_string in ERROR_TYPES:
+            if error_string in readable_content:
+                try:
+                    line_index_start = (readable_content.index(error_string) + len(error_string) + 2)
+                except ValueError:
+                    print('unrecognized error')
+                finally:
+                    break
+        line_index_end = readable_content.find('.ini') + len('.ini')
+        if line_index_start == 0:
+            line_index_start = line_index_end - 200 + readable_content[(line_index_end - 200):line_index_end].find('data')
+        partial_path = readable_content[line_index_start:line_index_end]
+    full_path = f"{WORLDBUILDER_PATH[:WORLDBUILDER_PATH.rfind('worldbuilder.exe')]}{partial_path}"  # .replace('\\', '/')
+    try:
+        with open(full_path, 'r') as erroneous_file:
+            erroneous_file.read()
+            print(f'file {full_path} exists and is readable')
+            # check_includes(full_path)
+    except FileNotFoundError:
+        # with open(full_path, "w") as missing_file:
+        #     missing_file.write(";;; moved")
+        # append_undeletable_log([full_path])
+        print(f'file {full_path} recreated as empty')
+        launch_and_read_last_dump()
+    except PermissionError:
+        # launch_and_read_last_dump()
+        pass

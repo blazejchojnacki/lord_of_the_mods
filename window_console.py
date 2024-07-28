@@ -6,11 +6,11 @@ from tkinter.simpledialog import askstring
 from tkinter.filedialog import askopenfilenames, askdirectory
 from tkinter.ttk import Treeview
 
-from mods_enabler import Mod, load_mods, edit_mod, activate_mod, deactivate_mod, reload_mod, create_mod
-from file_editor import find_text, replace_text, move_file, duplicates_commenter, load_file, load_directories
+from constants import INI_COMMENTS
+from settings_editor import read_settings, save_settings, GAME_PATH, WORLDBUILDER_PATH
 from file_interpreter import convert_string
-from constants import INI_COMMENTS, GAME_PATH, WORLDBUILDER_PATH
-from settings_editor import read_settings, save_settings
+from file_editor import find_text, replace_text, move_file, duplicates_commenter, load_file, load_directories
+from mods_enabler import Mod, load_mods, edit_mod, activate_mod, deactivate_mod, reload_mod, create_mod
 
 INI_LEVELS_COLORS = ['green', 'blue', 'purple', 'red', 'orange']
 

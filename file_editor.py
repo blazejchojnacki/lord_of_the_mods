@@ -1,19 +1,51 @@
 from datetime import datetime
 import os
 import shutil
+from tkinter.filedialog import askopenfilename, askdirectory
 
-from file_interpreter import load_items, print_items, comment_out, convert_string
-from constants import MODS_FOLDER, INI_FOLDER_PART, INI_COMMENTS, LOG_PATH
+from file_interpreter3 import load_items, print_items, comment_out, recognize_item_class
+from constants import INI_FOLDER_PART, INI_COMMENTS, INI_PARAMETERS, LEVEL_INDENT
+from settings_editor import MODS_FOLDER, LOG_PATH
 
 # TODO later: reference checker
 # TODO: file comparator
 # TODO: automated proposition of #include creation or child adopting
 
 
-def find_text(find, in_file_or_folder, mode=0):
-    """ finds a given string in a given file or folder of files.
+def convert_string(string, direction='automatic'):
+    """
+    converts the \n \t \r characters for reading or for finding the string in a file
+    :param string: str to convert
+    :param direction: 'automatic', 'process', 'display'
+    :return: converted string
+    """
+    to_convert = {
+        '\n': '\\n',
+        '\t': '\\t',
+        '\r': '\\r',
+        ' ': '·'
+    }
+    for key in to_convert:
+        if direction == 'process' or to_convert[key] in string and direction != 'display':
+            for character in to_convert:
+                string = string.replace(to_convert[character], character)
+            return string
+        elif key in string or direction == 'display':
+            for character in to_convert:
+                string = string.replace(character, to_convert[character])
+            return string
+        else:
+            return string
 
-    In mode 2 returns the first line where the string was found. It returns an empty string if not found"""
+
+def find_text(find, in_file_or_folder, mode=0):
+    """
+     finds a given string in a given file or folder of files.
+    :param find:
+    :param in_file_or_folder:
+    :param mode: mode 2 returns the first line where the string was found. It returns an empty string if not found
+    :return:
+    """
     output = ''
     if not find:
         return 'file_editor.find_text() aborted - empty string to find'
@@ -30,7 +62,7 @@ def find_text(find, in_file_or_folder, mode=0):
         try:
             # with open(in_file_or_folder, 'r') as file:
             #     file_content = file.read()
-            file_content = print_items(load_items(in_file_or_folder))[0]
+            file_content = print_items(file=in_file_or_folder)
             if file_content.count(find) > 0:
                 if mode < 2:
                     output += f'\tin {in_file_or_folder} found {file_content.count(find)}:\n'
@@ -44,7 +76,7 @@ def find_text(find, in_file_or_folder, mode=0):
                                           file_content.find('\n', file_content.find(find))]
                     # output = in_file_or_folder
             elif mode == 0:
-                output += f'\tfound {file_content.count(find)}\n'
+                output += f'\tfound none\n'  # {file_content.count(find)}
         except UnicodeDecodeError:
             output += f'file_editor.find_text() error: file {in_file_or_folder} unreadable'
         except ValueError:
@@ -184,7 +216,7 @@ def move_file(full_path, to_folder, mode=0):
     """moves a given file to a given folder and updates the references to or in this file."""
     output = ''
     file_name = full_path.replace('\\', '/').split('/')[-1]
-    if MODS_FOLDER not in to_folder:
+    if MODS_FOLDER.replace('/', '\\') not in to_folder.replace('/', '\\'):
         return 'file_editor.move_file aborted - destination path not in MODS_FOLDER'
     try:
         if mode == 0:
@@ -207,7 +239,6 @@ def move_file(full_path, to_folder, mode=0):
     return output
 
 
-# TODO: comment a part of the displayed text
 # TODO: look for duplicates in other files too. Objects can be overwritten.
 def duplicates_commenter(in_file):
     """
@@ -219,20 +250,26 @@ def duplicates_commenter(in_file):
     output = f'{datetime.now()}'
     output += f' command: comment out duplicates in {in_file}:\n'
     items = load_items(in_file)
+    if type(items) is str:
+        return items
     items_number = len(items)
     remaining_items_index = 1
+    last_result = ''
     for item_index in range(1, items_number):
         to_comment = False
         remaining_items_index += 1
         for remaining_item_index in range(remaining_items_index, items_number):
-            if items[item_index].name.capitalize() == items[remaining_item_index].name.capitalize():
-                if items[item_index].level_class == items[remaining_item_index].level_class:
+            if items[item_index].parameter['name'].lower() == items[remaining_item_index].parameter['name'].lower():
+                if items[item_index].parameter['class'] == items[remaining_item_index].parameter['class']:
                     to_comment = True
         if to_comment:
             new_content += comment_out(print_items([items[0], items[item_index]])[0])
-            output += print_items([items[0], items[item_index]])
+            last_result = print_items([items[0], items[item_index]])
+            output += last_result
         else:
             new_content += print_items([items[0], items[item_index]])
+    if not last_result:
+        output += 'no duplicate definition found'
     try:
         with open(f'{LOG_PATH}/file_changes.txt', 'a') as log_file:
             log_file.write(output + '\n')
@@ -244,7 +281,6 @@ def duplicates_commenter(in_file):
     return output
 
 
-# from tkinter.filedialog import askopenfilename, askdirectory
 # print(move_file(askopenfilename(), askdirectory(), mode=1))
 
 
@@ -255,7 +291,8 @@ def load_file(full_path):
     :return: the file content
     """
     if full_path.endswith('.ini') or full_path.endswith('.str'):
-        file_content, file_levels = print_items(load_items(full_path))
+        file_content = print_items(file=full_path)
+        file_levels = recognize_item_class(from_file=full_path)
         return file_content, file_levels
     elif full_path.endswith('.txt') or full_path.endswith('.inc'):
         with open(full_path) as loaded_file:
@@ -290,3 +327,81 @@ def load_directories(full_path, mode=0):
 
 # sure = load_directories(inspected_folder, mode=0)
 # print(sure)
+
+# 024-07-15
+def restore_default(module_class='', from_mod=''):
+    default_item = load_items(f'{from_mod}default/object.ini', mode=1)[1]
+    for module in default_item.sublevel:
+        if module.level_class == module_class:
+            default_module = module
+            default_module.comment.clear()
+            default_module.comment = {'init': '', 'all': ''}
+            return default_module
+
+
+# 024-07-13-15
+def adopt_children(loaded_items, parent_item=None):
+    if not parent_item:
+        parent_item = loaded_items[1]
+    loaded_items_copy = loaded_items[2:].copy()
+    loaded_item_path = loaded_items[0].name[:loaded_items[0].name.index('/ini/') + len('/ini/')]
+    for item in loaded_items_copy:
+        if item.level_class == 'Object':
+            append_module = []
+            item.level_class = 'ChildObject'
+            item.tag = parent_item.name
+            for parameter in INI_PARAMETERS:
+                if item.parameter[parameter] == parent_item.parameter[parameter]:
+                    item.parameter[parameter] = ''
+            for index in range(parent_item.order_index):
+                if index in parent_item.content:
+                    for key in range(item.order_index):
+                        try:
+                            if parent_item.content[index] == item.content[key]:
+                                item.content.pop(key)
+                                break
+                        except KeyError:
+                            pass
+                elif index in parent_item.comment:
+                    for key in range(item.order_index):
+                        try:
+                            if parent_item.comment[index] == item.comment[key]:
+                                item.comment.pop(key)
+                                break
+                        except KeyError:
+                            pass
+                # elif index in [_.order_index for _ in parent_item.sublevel]:
+                else:
+                    for parent_level in parent_item.sublevel:
+                        if index == parent_level.order_index:
+                            for level in item.sublevel:
+                                if level.name == parent_level.name:
+                                    keep_level = False
+                                    for line in level.content['all'].split('\n'):
+                                        if line not in parent_level.content['all'].split('\n'):
+                                            keep_level = True
+                                    if not keep_level:
+                                        item.sublevel.pop(item.sublevel.index(level))
+
+                            # if parent_level.level_class not in [_.level_class for _ in item.sublevel]:
+                            if parent_level.name not in [_.name for _ in item.sublevel]:
+                                if parent_level.tag:
+                                    item.order_index += 1
+                                    item.content[item.order_index] = f'{LEVEL_INDENT}RemoveModule {parent_level.tag}\n'
+                                else:
+                                    # item.order_index += 1
+                                    # item.sublevel.append(restore_default(parent_level.level_class, loaded_item_path))
+                                    append_module.append(parent_level.level_class)
+                            elif parent_level.level_class not in [_.level_class for _ in item.sublevel]:
+                                append_module.append(parent_level.level_class)
+            for module in append_module:
+                item.order_index += 1
+                item.sublevel.append(restore_default(module, loaded_item_path))
+                item.sublevel[-1].order_index = item.order_index
+    result_items = [loaded_items[0], parent_item]
+    for item in loaded_items_copy:
+        result_items.append(item)
+    return result_items
+
+
+# print(print_items(adopt_children(load_items(askopenfilename()))[:4])[0])

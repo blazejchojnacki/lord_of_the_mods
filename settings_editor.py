@@ -1,7 +1,6 @@
 import os.path
 
-INI_ENDS = ['End', 'END', 'EndScript']
-SETTINGS_FILE = 'LotM_settings.ini'
+from constants import INI_ENDS, INI_COMMENTS, SETTINGS_FILE, SETTINGS_STRUCTURE, SETTINGS_DICT
 
 GAME_PATH = ''
 WORLDBUILDER_PATH = ''
@@ -12,28 +11,96 @@ EXCEPTION_FOLDERS = []
 MOD_TEMPLATE = ''
 
 
-def read_settings():
-    """ returns a dictionary of settings read from the SETTING_FILE"""
-    settings = {}
-    with open(SETTINGS_FILE) as settings_file:
-        settings_lines = settings_file.readlines()
-    container_name = ''
-    container_open = False
-    for line in settings_lines:
-        if '=' in line:
-            set_key, set_value = line.strip().split(' = ')
-            if not container_open:
-                settings[set_key] = set_value
+def check_settings(mode='lines'):
+    """
+    Checks the parameters of the SETTINGS_FILE against any deviations from the hardcoded form of the settings.ini
+    :return: a list of lines being the split SETTINGS_FILE if it is correct or being valueless if incorrect
+    """
+    settings_dict = {}
+    structure_keys = []
+    structure_containers = []
+    structure_lines = SETTINGS_STRUCTURE.split('\n')
+    for structure_line in structure_lines:
+        if ' =' in structure_line:
+            structure_keys.append(structure_line.strip().split(' =')[0])
+        elif (structure_line.strip() != 'Settings' and structure_line.strip() not in INI_ENDS
+              and len(structure_line.strip()) > 1):
+            if structure_line.strip()[0] not in [_[0] for _ in INI_COMMENTS]:
+                structure_containers.append(structure_line.strip())
+    try:
+        container_open = False
+        container_name = ''
+        with open(SETTINGS_FILE) as settings_file:
+            settings_lines = settings_file.readlines()
+        structure_keys_copy = structure_keys.copy()
+        for line in settings_lines:
+            if ' = ' in line:
+                key, value = line.strip().split(' = ')
+                if key not in structure_keys:
+                    print(f'unrecognized key: {key}')
+                    raise FileNotFoundError
+                else:
+                    try:
+                        structure_keys_copy.remove(key)
+                    except ValueError:
+                        pass
+                    if container_open:
+                        settings_dict[container_name].append(value)
+                    else:
+                        settings_dict[key] = value
+            elif line.strip() in INI_ENDS:
+                container_open = False
+            elif line.strip()[0] in [_[0] for _ in INI_COMMENTS]:
+                settings_dict['comment'] = line.rstrip()
+            elif line.strip() != 'Settings' and line.strip() in structure_containers:
+                container_name = line.strip()
+                container_open = True
+                settings_dict[container_name] = []
             else:
-                settings[container_name].append(set_value)
-        elif line.strip() not in INI_ENDS and line.strip() != 'Settings':
-            container_name = line.strip()
-            container_open = True
-            settings[container_name] = []
-        elif line.strip() in INI_ENDS:
-            container_open = False
-        # else:
-        #     pass
+                pass
+        for missing_key in structure_keys_copy:
+            print(f'missing key: {missing_key}')
+    except FileNotFoundError:
+        # with open(SETTINGS_FILE, 'w') as settings_file_new:
+        #     settings_file_new.write(SETTINGS_STRUCTURE)
+        settings_lines = structure_lines
+        settings_dict = SETTINGS_DICT
+    if mode == 'lines':
+        return settings_lines
+    else:
+        return settings_dict
+
+
+# print(check_settings())
+
+
+def read_settings():
+    """
+    returns a dictionary of settings read from the SETTING_FILE
+    :return:
+    """
+    # settings = {}
+    # # with open(SETTINGS_FILE) as settings_file:
+    # #     settings_lines = settings_file.readlines()
+    # settings_lines = check_settings()
+    # container_name = ''
+    # container_open = False
+    # for line in settings_lines:
+    #     if ' = ' in line:
+    #         set_key, set_value = line.strip().split(' = ')
+    #         if not container_open:
+    #             settings[set_key] = set_value
+    #         else:
+    #             settings[container_name].append(set_value)
+    #     elif line.strip() not in INI_ENDS and line.strip() != 'Settings':
+    #         container_name = line.strip()
+    #         container_open = True
+    #         settings[container_name] = []
+    #     elif line.strip() in INI_ENDS:
+    #         container_open = False
+    #     # else:
+    #     #     pass
+    settings = check_settings(mode='dict')
     return settings
 
 
@@ -57,19 +124,21 @@ def load_settings():
     return GAME_PATH, WORLDBUILDER_PATH, MODS_FOLDER, BACKUP_FOLDER, EXCEPTION_FOLDERS, MOD_TEMPLATE, LOG_PATH
 
 
+load_settings()
+
+
 def save_settings(dictionary_settings=None, **keyword_settings):
     """
-    reads values inserted in the application and saves them to the SETTING_FILE.
-    Then it checks if the new settings are valid. If not retrieves the previous settings.
-    :param dictionary_settings:
-    :param keyword_settings:
+    Saves the values provided (inserted in the application) to the SETTING_FILE.
+    Then it checks if the new settings are valid. If not, retrieves the previous settings.
+    :param dictionary_settings: settings organized in a dictionary
+    :param keyword_settings: settings as key-word arguments-values pairs
     :return: string sentence about success or failure to find the paths provided
     """
     if not keyword_settings and dictionary_settings is not None:
         keyword_settings = dictionary_settings
     settings = read_settings()
-    with open(SETTINGS_FILE, 'r') as settings_file:
-        settings_lines = settings_file.readlines()
+    settings_lines = check_settings()
     with open(SETTINGS_FILE.replace('.ini', '_copy.ini'), 'w') as settings_file_copy:
         settings_file_copy.write(''.join(settings_lines))
     settings_new_content = ''
