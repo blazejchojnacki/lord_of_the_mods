@@ -1,14 +1,13 @@
 from datetime import datetime
 import os
 import shutil
-from tkinter.filedialog import askopenfilename, askdirectory
+# from tkinter.filedialog import askopenfilename, askdirectory
 
-from file_interpreter3 import load_items, print_items, comment_out, recognize_item_class
-from constants import INI_FOLDER_PART, INI_COMMENTS, INI_PARAMETERS, LEVEL_INDENT
-from settings_editor import MODS_FOLDER, LOG_PATH
+from file_interpreter import load_items, print_items, comment_out, recognize_item_class
+from constants import INI_PATH_PART, INI_COMMENTS, INI_PARAMETERS, LEVEL_INDENT
+from settings_editor import MODULES_LIBRARY, LOG_PATH
 
 # TODO later: reference checker
-# TODO: file comparator
 # TODO: automated proposition of #include creation or child adopting
 
 
@@ -49,7 +48,7 @@ def find_text(find, in_file_or_folder, mode=0):
     output = ''
     if not find:
         return 'file_editor.find_text() aborted - empty string to find'
-    if MODS_FOLDER.replace('/', '\\') not in in_file_or_folder.replace('/', '\\'):
+    if MODULES_LIBRARY.replace('/', '\\') not in in_file_or_folder.replace('/', '\\'):
         return 'file_editor.replace_text() aborted - item not in MODS_FOLDER'
     if mode == 0:
         output += f' command: find "{convert_string(find, direction="display")}"\n\tin {in_file_or_folder}.\nresult:'
@@ -89,7 +88,7 @@ def replace_text(find, replace_with, in_file_or_folder, mode=0):
     output = ''
     if not find:
         return 'file_editor.find_text() aborted - empty string to find'
-    if MODS_FOLDER.replace('/', '\\') not in in_file_or_folder.replace('/', '\\'):
+    if MODULES_LIBRARY.replace('/', '\\') not in in_file_or_folder.replace('/', '\\'):
         return 'file_editor.replace_text() aborted - item not in MODS_FOLDER'
     if mode == 0:
         output += f'{datetime.now()}'
@@ -216,7 +215,7 @@ def move_file(full_path, to_folder, mode=0):
     """moves a given file to a given folder and updates the references to or in this file."""
     output = ''
     file_name = full_path.replace('\\', '/').split('/')[-1]
-    if MODS_FOLDER.replace('/', '\\') not in to_folder.replace('/', '\\'):
+    if MODULES_LIBRARY.replace('/', '\\') not in to_folder.replace('/', '\\'):
         return 'file_editor.move_file aborted - destination path not in MODS_FOLDER'
     try:
         if mode == 0:
@@ -224,7 +223,7 @@ def move_file(full_path, to_folder, mode=0):
             output += f' command: move {full_path}\n\tto {to_folder}\n'
             shutil.move(full_path, f'{to_folder}/{file_name}')
         if file_name.endswith('.inc'):
-            ini_folder = to_folder[:to_folder.find(INI_FOLDER_PART) + len(INI_FOLDER_PART)]
+            ini_folder = to_folder[:to_folder.find(INI_PATH_PART) + len(INI_PATH_PART)]
             output += update_reference(new_path=f'{to_folder}/{file_name}', in_file_or_folder=ini_folder)
         elif file_name.endswith('.ini'):
             output += update_single_reference(old_path=full_path, new_path=f'{to_folder}/{file_name}', mode=mode)
@@ -325,8 +324,7 @@ def load_directories(full_path, mode=0):
     return output_folders, output_files
 
 
-# sure = load_directories(inspected_folder, mode=0)
-# print(sure)
+# print(load_directories(inspected_folder, mode=0))
 
 # 024-07-15
 def restore_default(module_class='', from_mod=''):
@@ -344,7 +342,7 @@ def adopt_children(loaded_items, parent_item=None):
     if not parent_item:
         parent_item = loaded_items[1]
     loaded_items_copy = loaded_items[2:].copy()
-    loaded_item_path = loaded_items[0].name[:loaded_items[0].name.index('/ini/') + len('/ini/')]
+    loaded_item_path = loaded_items[0].parameter['name'][:loaded_items[0].parameter['name'].index('/ini/') + len('/ini/')]
     for item in loaded_items_copy:
         if item.level_class == 'Object':
             append_module = []

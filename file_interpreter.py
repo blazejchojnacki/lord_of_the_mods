@@ -1,38 +1,15 @@
+# 024-07-19
 import os
 from datetime import datetime
 from glob import glob
 import codecs
 
-from constants import INI_COMMENTS, INI_DELIMITERS, STR_DELIMITERS, INI_ENDS, LEVEL_INDENT
-from settings_editor import WORLDBUILDER_PATH
+from constants import INI_COMMENTS, INI_DELIMITERS, STR_DELIMITERS, INI_ENDS, LEVEL_INDENT, INI_PATH_PART
+from settings_editor import WORLDBUILDER_PATH, MODULES_LIBRARY
 
 
-class ItemLevel:
-    """ a class storing a part of an item like an Object or an ObjectCreationList defined in an INI or STR file"""
-    def __init__(self, level_class='', order_index=0):
-        # super().__init__()
-        self.parameter = {}
-        self.level_class = level_class
-        self.name = ''
-        self.tag = ''
-        self.content = {'all': ''}
-        self.comment = {'init': '', 'all': ''}
-        self.is_level_open = True
-        self.sublevel = []
-        self.order_index = order_index
+def recognize_item_class(from_file):
 
-
-def load_items(from_file, mode=0):
-    """
-     loads and reformats items like an Object or an ObjectCreationList defined in an INI or STR file
-    :param from_file: the full path of the source file to read the objects from
-    :param mode: mode=1 enables to exit at the first error with the object list created so far
-    :return: loaded items in form of a list of ItemLevel objects where the first describes the source file
-    """
-    current_level = 0
-    items = [ItemLevel('file')]
-    items[0].name = from_file
-    items[0].is_level_open = False
     file_item_type = []
     if from_file.endswith('.str'):
         file_item_type = STR_DELIMITERS
@@ -46,185 +23,200 @@ def load_items(from_file, mode=0):
                             file_item_type = items_levels
                             break
     file_item_type.append([])
-    items[0].sublevel = file_item_type
-    index_tracker = 0
-    initial_comment = ""
+    return file_item_type
+
+
+def load_items(from_file, mode=0):
+    """
+     loads and reformats items like an Object or an ObjectCreationList defined in an INI or STR file
+    :param from_file: the full path of the source file to read the objects from
+    :param mode: mode=1 enables to exit at the first error with the object list created so far
+    :return: loaded items in form of a list of ItemLevel objects where the first describes the source file
+    """
+    if not from_file:
+        return 'file_interpreter: load_items error: no file selected'
+    items = [[{'class': 'file'}]]
+    items[0][0]['name'] = from_file
+    file_item_type = recognize_item_class(from_file)
+    items[0].append({'structure': file_item_type})
+    current_level = 0
+    initial_comment = ''
+    # line_counter = 0
+    is_level_open = False
+    is_definition_open = False
     with open(from_file) as loaded_file:
         file_lines = loaded_file.readlines()
-        line_counter = 0
-        for file_line in file_lines:
-            # try:
-            line_counter += 1
-            words = file_line.replace('=', ' ').replace(':', ' ').split()
-            if file_line.strip() == '':
-                continue
-            elif file_line.strip()[0] in INI_COMMENTS:
-                if not items[-1].is_level_open:
-                    initial_comment += ' '.join(file_line.split()) + '\n'
-                elif current_level >= 1:
-                    items[-1].comment[index_tracker] = f"{LEVEL_INDENT * current_level}{' '.join(file_line.split())}\n"
-                    index_tracker += 1
-            elif words[0] in file_item_type[current_level]:
-                if current_level == 0:
-                    items.append(ItemLevel(level_class=words[0]))
-                    index_tracker = 0
-                    items[-1].is_level_open = True
-                    if len(words) >= 2 and words[1][0] not in INI_COMMENTS:
-                        items[-1].name = words[1]
-                        if len(words) >= 3 and words[2][0] not in INI_COMMENTS:
-                            items[-1].tag = words[2]
-                            if len(words) > 3 and words[3][0] in INI_COMMENTS:
-                                items[-1].comment[index_tracker] = LEVEL_INDENT + file_line[file_line.index(words[3]):]
-                                index_tracker += 1
-                elif current_level == 1:
-                    items[-1].sublevel.append(ItemLevel(level_class=words[0], order_index=index_tracker))
-                    index_tracker += 1
-                    if len(words) >= 2 and words[1][0] not in INI_COMMENTS:
-                        items[-1].sublevel[-1].name = words[1]
-                        if len(words) >= 3 and words[2][0] not in INI_COMMENTS:
-                            items[-1].sublevel[-1].tag = words[2]
-                elif current_level > 1:
-                    try:
-                        if items[-1].sublevel[-1].is_level_open:
-                            items[-1].sublevel[-1].content["all"] += (f"{LEVEL_INDENT * current_level}"
-                                                                      f"{' '.join(file_line.split())}\n")
-                    except IndexError:
-                        items[-1].content[index_tracker] = f"{LEVEL_INDENT}{' '.join(file_line.split())}\n"
-                        index_tracker += 1
-                current_level += 1
-            elif words[0] in INI_ENDS:
-                current_level -= 1
-                if current_level == 0:
-                    items[-1].is_level_open = False
-                    items[-1].comment["init"] = initial_comment
-                    initial_comment = ""
-                    items[-1].order_index = index_tracker
-                elif current_level == 1:
-                    items[-1].sublevel[-1].is_level_open = False
-                elif current_level > 1:
-                    try:
-                        if items[-1].sublevel[-1].is_level_open:
-                            items[-1].sublevel[-1].content['all'] += (f"{LEVEL_INDENT * current_level}"
-                                                                      f"{' '.join(file_line.split())}\n")
-                    except IndexError:
-                        items[-1].content[index_tracker] += f"{LEVEL_INDENT}{' '.join(file_line.split())}\n"
-                        index_tracker += 1
-            # elif words[0] in INI_PARAMETERS and current_level == 1:
-            #     items[-1].parameter[words[0]] = file_line.strip().split('=')[1].strip()
-            elif items[-1].is_level_open:
+    for file_line in file_lines:
+        # line_counter += 1
+        words = file_line.replace('=', ' ').replace(':', ' ').split()
+        if file_line.strip() == '':
+            continue
+        elif file_line.strip()[0] in INI_COMMENTS:
+            if not is_definition_open:  # not is_level_open
+                initial_comment += ' '.join(file_line.split()) + '\n'
+            elif current_level == 1:
+                items[-1].append({'comment': f"{LEVEL_INDENT * current_level}{' '.join(file_line.split())}\n"})
+            elif current_level > 1:
+                items[-1][-1].append(
+                    {'comment': f"{LEVEL_INDENT * current_level}{' '.join(file_line.split())}\n"}
+                )
+        elif words[0] in file_item_type[current_level]:
+            if current_level == 0:
+                items.append([{}, {'class': 'words[0]'}])
+                items[-1][1]['class'] = words[0]
+                is_definition_open = True
+                if len(words) >= 2:
+                    if words[1][0] not in INI_COMMENTS:
+                        items[-1][1]['name'] = words[1]
+                        if len(words) >= 3:
+                            if words[2][0] not in INI_COMMENTS:
+                                items[-1][-1]['identifier'] = words[2]
+                                if len(words) > 3 and words[3][0] in INI_COMMENTS:
+                                    items[-1][-1]['comment'] = (
+                                        f'{LEVEL_INDENT * current_level}'
+                                        f'{file_line[file_line.index(words[3]):]}'
+                                    )
+                            elif words[2][0] in INI_COMMENTS:
+                                items[-1][-1]['comment'] = words[2:]
+                    elif words[1][0] in INI_COMMENTS:
+                        items[-1][-1]['comment'] = words[1:]
+            elif current_level == 1:
+                items[-1].append([])
+                items[-1][-1].append({'class': words[0]})
+                is_level_open = True
+                if len(words) >= 2:
+                    if words[1][0] not in INI_COMMENTS:
+                        items[-1][-1][0]['name'] = words[1]
+                        if len(words) >= 3:
+                            if words[2][0] not in INI_COMMENTS:
+                                items[-1][-1][0]['identifier'] = words[2]
+                                if len(words) > 3 and words[3][0] in INI_COMMENTS:
+                                    items[-1][-1][0]['comment'] = (
+                                        f'{LEVEL_INDENT * current_level}'
+                                        f'{file_line[file_line.index(words[3]):]}'
+                                    )
+                            elif words[2][0] in INI_COMMENTS:
+                                items[-1][-1]['comment'] = words[2:]
+                    elif words[1][0] in INI_COMMENTS:
+                        items[-1][-1]['comment'] = words[1:]
+            elif current_level > 1:
                 try:
-                    if items[-1].sublevel[-1].is_level_open:
-                        items[-1].sublevel[-1].content['all'] += (f"{LEVEL_INDENT * current_level}"
-                                                                  f"{' '.join(file_line.split())}\n")
-                    else:
-                        items[-1].content[index_tracker] = f"{LEVEL_INDENT}{' '.join(file_line.split())}\n"
-                        index_tracker += 1
-                except IndexError:
-                    items[-1].content[index_tracker] = f"{LEVEL_INDENT}{' '.join(file_line.split())}\n"
-                    index_tracker += 1
-            else:
-                if mode == 1:
-                    return items
-                print('exception: ' + file_line)
-            # except IndexError:
-            #     if mode == 1:
-            #         return items
+                    if is_level_open:
+                        items[-1][-1].append(
+                            {'assignation': f"{LEVEL_INDENT * current_level}{' '.join(file_line.split())}\n"}
+                        )
+                except AttributeError:
+                    items[-1].append(
+                        {'assignation': f"{LEVEL_INDENT}{' '.join(file_line.split())}\n"}
+                    )
+            current_level += 1
+        elif words[0] in INI_ENDS:
+            current_level -= 1
+            if current_level == 0:
+                items[-1][0]['comment'] = initial_comment
+                initial_comment = ''
+                is_definition_open = False
+            elif current_level == 1:
+                is_level_open = False
+            elif current_level > 1:
+                try:
+                    if is_level_open:
+                        items[-1][-1].append(
+                            {'assignation': f"{LEVEL_INDENT * current_level}{' '.join(file_line.split())}\n"}
+                        )
+                except AttributeError:  # IndexError:
+                    items[-1].append(
+                        {'assignation': f"{LEVEL_INDENT * current_level}{' '.join(file_line.split())}\n"}
+                    )
+        elif is_definition_open:
+            try:
+                if is_level_open:
+                    items[-1][-1].append(
+                        {'assignation': f"{LEVEL_INDENT * current_level}{' '.join(file_line.split())}\n"}
+                    )
+                else:
+                    items[-1].append(
+                        {'assignation': f"{LEVEL_INDENT}{' '.join(file_line.split())}\n"}
+                    )
+            except AttributeError:
+                items[-1].append(
+                    {'assignation': f"{LEVEL_INDENT}{' '.join(file_line.split())}\n"}
+                )
+        else:
+            if mode == 1:
+                return items
+            print('file interpreter: load_items() exception: ' + file_line)
     return items
 
 
-def print_items(items):
+def print_items(items=None, file=None):
     """
      concatenates a string from loaded items like an Object or an ObjectCreationList defined in an INI or STR file
     :param items: loaded items as a list of object returned by the load_items() function
+    :param file:
     :return: printable string being the reformatted content of a file
     """
+    if not items and file:
+        items = load_items(file)
     output = ''
     levels_list = []
     splitter = ' '
-    for item in items:
-        if item.level_class == 'file':
-            levels_list = item.sublevel
-            if item.name[-len('.str'):] == '.str':
-                splitter = ':'
-        elif item.level_class in levels_list[0]:
-            output += '\n' + item.comment['init'] + item.level_class
-            if item.tag != '':
-                output += splitter + item.name + splitter + item.tag
-            elif item.name != '':
-                output += splitter + item.name
-            output += '\n'
-            for param in item.parameter:
-                output += f'{LEVEL_INDENT}{param} = {item.parameter[param]}\n'
-
-            for key in range(item.order_index):
+    if items[0][0]['class'] == 'file':
+        levels_list = items[0][1]['structure']
+        if items[0][0]['name'].endswith('.str'):
+            splitter = ':'
+    for item in items[1:]:
+        if item[1]['class'] in levels_list[0]:
+            for index in range(0, len(item)):
                 try:
-                    if key in item.content:
-                        output += item.content[key]
-                    elif key in item.comment:
-                        output += item.comment[key]
+                    if type(item[index]) is list:
+                        for level_index in range(len(item[index])):
+                            if type(item[index][level_index]) is dict:
+                                line = ''  # LEVEL_INDENT
+                                for key in item[index][level_index]:
+                                    line += ' ' + item[index][level_index][key]
+                                if line[0:len(LEVEL_INDENT)] != LEVEL_INDENT:
+                                    line = LEVEL_INDENT + line
+                                if line[-1] != '\n':
+                                    line += '\n'
+                                output += line[1:]
+                            else:
+                                output += item[index][level_index]
+                        output += f'{LEVEL_INDENT}End\n'
+                    elif type(item[index]) is dict:
+                        line = ''
+                        for key in item[index]:
+                            line += splitter + item[index][key]
+                        if line[-1] != '\n':
+                            line += '\n'
+                        output += line[1:]
                     else:
-                        for sublevel in item.sublevel:
-                            if sublevel.order_index == key:
-                                if sublevel.comment['all'] != '':
-                                    output += f'\n{LEVEL_INDENT}' + sublevel.comment['all']
-                                output += LEVEL_INDENT + sublevel.level_class
-                                if sublevel.name != '':
-                                    if sublevel.name == 'LifetimeUpdate':
-                                        output += ' ' + sublevel.name
-                                    else:
-                                        output += ' = ' + sublevel.name
-                                    if sublevel.tag != '':
-                                        output += splitter + sublevel.tag
-                                output += '\n'
-                                output += sublevel.content['all']
-                                output += f'{LEVEL_INDENT}End\n'
+                        output += item[index]
                 except KeyError:
                     print('file_interpreter: print_items() error: KeyError')
-            output += 'End\n'
-    return output, levels_list
+            output += 'End\n\n'
+    return output
+
+
+# from tkinter.filedialog import askopenfilename
+# print(print_items(file=askopenfilename()))
 
 
 def comment_out(lines):
-    """ comments out a few lines in a loaded and printed item"""
+    """
+    comments out a few lines in a loaded and printed item
+    :param lines:
+    :return:
+    """
     output = ''
     for line in lines.split('\n'):
         output += f';;;{line}\n'
     return output
 
 
-# from tkinter.filedialog import askopenfilename
-# print(print_items(load_items(askopenfilename()))[0])
-
-
-def convert_string(string, direction='automatic'):
-    """
-    converts the \n \t \r characters for reading or for finding the string in a file
-    :param string: str to convert
-    :param direction: 'automatic', 'process', 'display'
-    :return: converted string
-    """
-    to_convert = {
-        '\n': '\\n',
-        '\t': '\\t',
-        '\r': '\\r',
-        ' ': '·'
-    }
-    for key in to_convert:
-        if direction == 'process' or to_convert[key] in string and direction != 'display':
-            for character in to_convert:
-                string = string.replace(to_convert[character], character)
-            return string
-        elif key in string or direction == 'display':
-            for character in to_convert:
-                string = string.replace(character, to_convert[character])
-            return string
-        else:
-            return string
-
-
 counter = 1
-object_override_path = r'O:\_MODULES\AotR8-INI_remake (ongoing)\AotR\aotr\data\ini\object\zealous_override\all_objects.txt'
-default_object_path = r'O:\_MODULES\AotR8-INI_remake (ongoing)\AotR\aotr\data\ini\object'
+default_object_path = f'{MODULES_LIBRARY}/AotR8-INI_remake/AotR/aotr{INI_PATH_PART}/object'
+object_override_path = f'{default_object_path}/zealous_override/all_objects.txt'
 
 
 def list_objects(file_or_folder=default_object_path, object_list_path=object_override_path, mode=0):
@@ -237,9 +229,6 @@ def list_objects(file_or_folder=default_object_path, object_list_path=object_ove
     """
     global counter
     items_name_list = []
-    # object_blocks = []
-    # for item in loaded_items[1:]:
-    #     items_name_list.append(item.name)
     if os.path.isfile(file_or_folder) and file_or_folder.endswith('.ini'):
         with open(file_or_folder) as read_file:
             file_lines = read_file.readlines()
@@ -265,6 +254,8 @@ def list_objects(file_or_folder=default_object_path, object_list_path=object_ove
         for object_block in items_name_list:
             override_file.write(object_block)
     return items_name_list
+
+
 # list_objects(mode=0)
 
 
@@ -317,36 +308,28 @@ def launch_and_read_last_dump():
         error_content = error_content_file.read()
         readable_content = ''
         for character in error_content:
-            # try:
             if character in range(32, 123):
                 readable_content += f'{character:c}'
-            # except:
-            #     pass
         line_index_start = 0
         for error_string in ERROR_TYPES:
             if error_string in readable_content:
                 try:
                     line_index_start = (readable_content.index(error_string) + len(error_string) + 2)
                 except ValueError:
-                    print('unrecognized error')
+                    print('file_interpreter: launch_and_read_last_dump error: value error')
                 finally:
                     break
         line_index_end = readable_content.find('.ini') + len('.ini')
         if line_index_start == 0:
-            line_index_start = line_index_end - 200 + readable_content[(line_index_end - 200):line_index_end].find('data')
+            line_index_start = line_index_end - 200 + readable_content[(line_index_end - 200):line_index_end].find(
+                'data')
         partial_path = readable_content[line_index_start:line_index_end]
-    full_path = f"{WORLDBUILDER_PATH[:WORLDBUILDER_PATH.rfind('worldbuilder.exe')]}{partial_path}"  # .replace('\\', '/')
+    full_path = f"{WORLDBUILDER_PATH[:WORLDBUILDER_PATH.rfind('worldbuilder.exe')]}{partial_path}"
     try:
         with open(full_path, 'r') as erroneous_file:
             erroneous_file.read()
             print(f'file {full_path} exists and is readable')
-            # check_includes(full_path)
     except FileNotFoundError:
-        # with open(full_path, "w") as missing_file:
-        #     missing_file.write(";;; moved")
-        # append_undeletable_log([full_path])
-        print(f'file {full_path} recreated as empty')
-        launch_and_read_last_dump()
+        print(f'file_interpreter: launch_and_read_last_dump error: {full_path} FileNotFoundError')
     except PermissionError:
-        # launch_and_read_last_dump()
-        pass
+        print(f'file_interpreter: launch_and_read_last_dump error: {full_path} PermissionError')
